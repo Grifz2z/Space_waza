@@ -1,5 +1,5 @@
 use minifb::{Key, Window, WindowOptions, KeyRepeat};
-
+use rand::Rng;
 
 fn draw_pixel(buf: &mut Vec<u32>, x: u32, y: u32, width: u32, colour : u32) {
     // Calculer l'index uniquement si (x, y) est dans les limites du buffer
@@ -30,8 +30,8 @@ struct ElementGraphique {
 
 impl ElementGraphique {
 
-    pub fn draw(&self, buf : &mut Vec<u32>, width_screen: u32) {
-        draw_rect(buf, self.x as u32, self.y as u32, width_screen, 10, 20, self.col)
+    pub fn draw(&self, buf : &mut Vec<u32>, width_screen: u32, width : u32, height : u32) {
+        draw_rect(buf, self.x as u32, self.y as u32, width_screen, width, height, self.col)
     }
 
     pub fn update(&mut self) {
@@ -55,10 +55,9 @@ struct Vaisseau {
 }
 
 impl Vaisseau {
-    /* 
     pub fn new( x : f32, y : f32, dx : f32, dy : f32, width : u32, height : u32, col : u32,) -> Self {
         Vaisseau {
-            element : ElementGraphique {
+            parent : ElementGraphique {
                 x : x,
                 y : y,
                 dx : dx,   
@@ -66,9 +65,11 @@ impl Vaisseau {
                 width : width,
                 height : height,
                 col : col,
-            }
+            },
+            liste_tirs : Vec::new(),
         } 
-    }*/
+    }
+
     pub fn update(&mut self, width_screen: u32) {
         self.parent.x += self.parent.dx;
 
@@ -80,7 +81,7 @@ impl Vaisseau {
     }
 
     pub fn tirer(&mut self){
-        self.liste_tirs.push(Missile{x : self.player.x  + 20 as f32, y : self.player.y - 20 as f32, width : 10, height : 20});
+        self.liste_tirs.push(Missile::new((self.parent.x + (self.parent.x+self.parent.width as f32))/2.0, self.parent.y - 5.0, 0.0, -5.0, 10, 15, 0xfff000));
     }
 
 }
@@ -90,10 +91,9 @@ struct Ennemi {
 }
 
 impl Ennemi {
-    /* 
     pub fn new( x : f32, y : f32, dx : f32, dy : f32, width : u32, height : u32, col : u32,) -> Self {
         Ennemi {
-            element : ElementGraphique {
+            parent : ElementGraphique {
                 x : x,
                 y : y,
                 dx : dx,   
@@ -103,12 +103,6 @@ impl Ennemi {
                 col : col,
             }
         } 
-    }*/
-    pub fn update(&mut self) {
-        self.parent.update();
-    }
-    pub fn collision(&self, other : ElementGraphique) -> bool{
-        self.parent.collision(other)
     }
 }
 
@@ -117,20 +111,20 @@ struct Missile {
 }
 
 impl Missile {
-    /* 
+     
     pub fn new( x : f32, y : f32, dx : f32, dy : f32, width : u32, height : u32, col : u32,) -> Self {
         Missile {
-            element : ElementGraphique {
-                x : x,
-                y : y,
-                dx : dx,   
-                dy : dy,
-                width : width,
-                height : height,
-                col : col,
+            parent : ElementGraphique {
+                x,
+                y,
+                dx,   
+                dy,
+                width,
+                height,
+                col,
             }
         } 
-    }*/
+    }
 }
 
 struct Jeu {
@@ -146,7 +140,7 @@ struct Jeu {
 }
 
 impl Jeu {
-    pub fn new(width: u32, height: u32, fps: usize, player: Vaisseau, liste_ennemy : Vec<Ennemi>) -> Self {
+    pub fn new(width: u32, height: u32, fps: usize, player: Vaisseau) -> Self {
         let buffer = vec![0; (width * height) as usize];
         let mut  window = Window::new(
             "Waza",
@@ -166,31 +160,40 @@ impl Jeu {
             window,
             fps,
             player,
-            liste_ennemy,
+            liste_ennemy : Vec::new(),
         }
     }
 
+    pub fn spawn_ennemy(&mut self){
+        let mut rng = rand::thread_rng();
+        self.liste_ennemy.push(Ennemi::new(rng.gen_range(50..=750) as f32, -20.0, 0.0, 2.0, 40, 40 ,0xffA5B6));
+    }
+
     pub fn input(&mut self){
-        self.player.update(self.width_screen);
+        self.player.parent.dx = 0.0;
+        for key in self.window.get_keys() {
+            match key {
+                Key::Left => self.player.parent.dx = -5.0,
+                Key::Right => self.player.parent.dx = 5.0,
+                _ => {}  
+            }
+        }
+        
         if self.window.is_key_pressed(Key::Space, KeyRepeat::No) && !self.space_pressed{
-            //self.new_missile();
+            self.player.tirer();
             self.space_pressed = true;
         }
         else {
             self.space_pressed = false;
         }
-        if self.window.is_key_pressed(Key::Right, KeyRepeat::Yes){
-            self.player.parent.dx = 5.0;
-        }
-        else if self.window.is_key_pressed(Key::Left, KeyRepeat::Yes) {
-            self.player.parent.dx = -5.0;
-        }
-        else {
-            self.player.parent.dx = 5.0;
-        }
+        
+        self.player.update(self.width_screen);
     }
 
     pub fn update(&mut self){
+        if self.frame_count%120 == 0{
+            self.spawn_ennemy();
+        }
         self.input();
 
         for tir in &mut self.player.liste_tirs {
@@ -199,6 +202,24 @@ impl Jeu {
         for ennemy in &mut self.liste_ennemy{
             ennemy.parent.y += 2.0;
         }
+
+        // ################## Gère les collisions #####################
+        let mut tirs_a_supprimer: Vec<usize> = Vec::new();
+        let mut ennemis_a_supprimer: Vec<usize> = Vec::new();
+        
+        for (i, tir) in self.player.liste_tirs.iter().enumerate() {
+            for (j, ennemi) in self.liste_ennemy.iter().enumerate() {
+                if tir.parent.collision(ennemi.parent) {
+                    tirs_a_supprimer.push(i);
+                    ennemis_a_supprimer.push(j);
+                }
+            }
+        }
+        
+        self.player.liste_tirs.retain(|_, i| !tirs_a_supprimer.contains(&i));
+        self.liste_ennemy.retain(|_, j| !ennemis_a_supprimer.contains(&j));
+        
+
         self.player.liste_tirs.retain(|tir| tir.parent.y > 0.0);
         self.liste_ennemy.retain(|ennemy| ennemy.parent.y < self.height_screen as f32 + 10 as f32);
         self.frame_count += 1
@@ -206,15 +227,15 @@ impl Jeu {
     }
 
     pub fn draw(&mut self){
-        self.player.parent.draw(&mut self.buffer, self.width_screen);
+        self.player.parent.draw(&mut self.buffer, self.width_screen,self.player.parent.width,self.player.parent.height);
             //self.player.update(&self.window, &self.width);
 
             for tir in &self.player.liste_tirs {
-                tir.parent.draw(&mut self.buffer, self.width_screen);
+                tir.parent.draw(&mut self.buffer, self.width_screen, tir.parent.width,tir.parent.height);
             }
 
             for ennemy in &self.liste_ennemy{
-                ennemy.parent.draw(&mut self.buffer, self.width_screen);
+                ennemy.parent.draw(&mut self.buffer, self.width_screen, ennemy.parent.width,ennemy.parent.height);
             }
     }
 
@@ -240,5 +261,10 @@ fn main() {
     //    height : 50,
     //};
     //let mut jeu_dans_main_vrai = Jeu::new(640, 360, 165, player, Vec::new());
-    //jeu_dans_main_vrai.run(); 
+    //jeu_dans_main_vrai.run();
+    let mut player = Vaisseau::new(10.0, 550.0, 0.0, 0.0, 50, 50, 0x000000);
+    let mut machin = Jeu::new(800,600,60,player);
+
+    machin.run();
+    
 }
