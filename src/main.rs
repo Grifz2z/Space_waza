@@ -50,7 +50,7 @@ impl ElementGraphique {
 }
 
 struct Vaisseau {
-    element: ElementGraphique,
+    parent: ElementGraphique,
     liste_tirs : Vec<Missile>,
 }
 
@@ -70,12 +70,12 @@ impl Vaisseau {
         } 
     }*/
     pub fn update(&mut self, width_screen: u32) {
-        self.element.x += self.element.dx;
+        self.parent.x += self.parent.dx;
 
-        if self.element.x < 0.0 {
-            self.element.x = width_screen as f32;
-        } else if self.element.x > width_screen as f32 {
-            self.element.x = 0.0;
+        if self.parent.x < 0.0 {
+            self.parent.x = width_screen as f32;
+        } else if self.parent.x > width_screen as f32 {
+            self.parent.x = 0.0;
         }
     }
 
@@ -86,7 +86,7 @@ impl Vaisseau {
 }
 
 struct Ennemi {
-    element: ElementGraphique,
+    parent: ElementGraphique,
 }
 
 impl Ennemi {
@@ -105,15 +105,15 @@ impl Ennemi {
         } 
     }*/
     pub fn update(&mut self) {
-        self.element.update();
+        self.parent.update();
     }
     pub fn collision(&self, other : ElementGraphique) -> bool{
-        self.element.collision(other)
+        self.parent.collision(other)
     }
 }
 
 struct Missile {
-    element: ElementGraphique,
+    parent: ElementGraphique,
 }
 
 impl Missile {
@@ -180,13 +180,13 @@ impl Jeu {
             self.space_pressed = false;
         }
         if self.window.is_key_pressed(Key::Right, KeyRepeat::Yes){
-            self.player.element.dx = 5.0;
+            self.player.parent.dx = 5.0;
         }
         else if self.window.is_key_pressed(Key::Left, KeyRepeat::Yes) {
-            self.player.element.dx = -5.0;
+            self.player.parent.dx = -5.0;
         }
         else {
-            self.player.element.dx = 5.0;
+            self.player.parent.dx = 5.0;
         }
     }
 
@@ -194,27 +194,27 @@ impl Jeu {
         self.input();
 
         for tir in &mut self.player.liste_tirs {
-            tir.element.y -= 5.0;
+            tir.parent.y -= 5.0;
         };
         for ennemy in &mut self.liste_ennemy{
-            ennemy.element.y += 2.0;
+            ennemy.parent.y += 2.0;
         }
-        self.player.liste_tirs.retain(|tir| tir.element.y > 0.0);
-        self.liste_ennemy.retain(|ennemy| ennemy.element.y < self.height_screen as f32 + 10 as f32);
+        self.player.liste_tirs.retain(|tir| tir.parent.y > 0.0);
+        self.liste_ennemy.retain(|ennemy| ennemy.parent.y < self.height_screen as f32 + 10 as f32);
         self.frame_count += 1
 
     }
 
     pub fn draw(&mut self){
-        self.player.element.draw(&mut self.buffer, self.width_screen);
+        self.player.parent.draw(&mut self.buffer, self.width_screen);
             //self.player.update(&self.window, &self.width);
 
             for tir in &self.player.liste_tirs {
-                tir.element.draw(&mut self.buffer, self.width_screen);
+                tir.parent.draw(&mut self.buffer, self.width_screen);
             }
 
             for ennemy in &self.liste_ennemy{
-                ennemy.element.draw(&mut self.buffer, self.width_screen);
+                ennemy.parent.draw(&mut self.buffer, self.width_screen);
             }
     }
 
