@@ -1,7 +1,7 @@
 use minifb::{Key, Window, WindowOptions, KeyRepeat};
 use rand::{seq::index, Rng};
 
-///Fonction permettant de dessiner un pyxel aux coordonnées (x; y)
+///Fonction permettant de dessiner les pyxel des coordonnées (x; y) à (x; y+width)
 fn draw_pixel(buf: &mut Vec<u32>, x: u32, y: u32, width: u32, colour : u32) {
     
     if x < width && y * width < buf.len() as u32 { // Calculer l'index uniquement si (x, y) est dans les limites du buffer
@@ -24,7 +24,6 @@ fn draw_rect(buf : &mut Vec<u32>, x : u32, y : u32, width_screen: u32, width : u
         }
     }
 }
-
 
 /// On crée un implémentation d'un élément graphique
 /// L'élément graphique (un rectangle), doit avoir : deux coordonées (x; y), des vecteurs de déplacement dx et dy,
@@ -68,6 +67,8 @@ impl ElementGraphique {
 struct Vaisseau {
     parent: ElementGraphique,
     liste_tirs : Vec<Missile>,
+    vies : i32,
+    vivant : bool,
 }
 
 impl Vaisseau {
@@ -84,6 +85,8 @@ impl Vaisseau {
                 col : col,
             },
             liste_tirs : Vec::new(),
+            vies : 8,
+            vivant : true,            
         } 
     }
 
@@ -255,8 +258,9 @@ impl Jeu {
 
     /// Fonction qui gère la mise à jour l'ensemble des éléments du Jeu
     pub fn update(&mut self){
+        self.frame_count += 1;
 
-        if self.frame_count%120 == 0{
+        if self.frame_count%50 == 0{
             self.spawn_ennemy();
         }
         self.input();
@@ -273,16 +277,23 @@ impl Jeu {
     /// Truc bidule qui check les collision + ça casse le cerveau waza
     pub fn check_collisions(&mut self) {
 
-        self.liste_ennemis.retain(|enn| {!enn.parent.collision(&self.player.parent)});
+        self.liste_ennemis.retain(|enn| {
+            if !enn.parent.collision(&self.player.parent){
+                return true;
+            }
+            self.player.vies -= 1;
+            false
+        });
 
         self.liste_ennemis.retain(|enn| {
-            let mut enn_a_enlever = true;
+            let mut non_enlever_ennemi = true;
             if enn.parent.y == self.height_screen as f32{
-                enn_a_enlever = false
+                non_enlever_ennemi = false;
+                self.player.vies -= 1;
             }
             self.player.liste_tirs.retain(|tir| {
                 if tir.parent.collision(&enn.parent) {
-                    enn_a_enlever = false;
+                    non_enlever_ennemi = false;
                     return false;
                 }
                 if tir.parent.y == 0.0 {
@@ -292,7 +303,7 @@ impl Jeu {
                     true
                 }
             });
-            enn_a_enlever
+            non_enlever_ennemi
         });
 
     }
@@ -308,13 +319,17 @@ impl Jeu {
         for ennemy in &self.liste_ennemis{
             ennemy.parent.draw(&mut self.buffer, self.width_screen, ennemy.parent.width,ennemy.parent.height);
         }
+
+        for i in 0..self.player.vies{
+            draw_rect(&mut self.buffer, 10+i as u32*60, 565, self.width_screen, 30, 30,0xff0000);
+        }
     }
 
     /// Fonction qui execute les fonctions du Jeu par une boucle
     pub fn run(&mut self){
         while self.window.is_open() && !self.window.is_key_down(Key::Escape) {
             self.update();
-            self.buffer = vec![0xFF0000; self.width_screen as usize * self.height_screen as usize];
+            self.buffer = vec![0x1355c1; self.width_screen as usize * self.height_screen as usize];
             self.draw();
             self.window.update_with_buffer(&self.buffer, self.width_screen as usize, self.height_screen as usize).unwrap();
             
@@ -325,7 +340,7 @@ impl Jeu {
 
 fn main() {
 
-    let player = Vaisseau::new(10.0, 550.0, 0.0, 0.0, 50, 50, 0x000000);
+    let player = Vaisseau::new(10.0, 510.0, 0.0, 0.0, 50, 50, 0xd6270f);
     let mut app = Jeu::new(800,600,60,player);
 
     app.run();
