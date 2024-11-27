@@ -6,7 +6,7 @@ Première chose faite : un écran rouge.
 
 
 2ème chose faite : le vaisseau et les missiles.
-https://github.com/user-attachments/assets/2d06a807-91d3-453f-b89a-cc79b7d6044d
+![video]https://github.com/user-attachments/assets/2d06a807-91d3-453f-b89a-cc79b7d6044d
 
 
 
@@ -15,5 +15,4 @@ https://github.com/user-attachments/assets/1d023d50-83aa-4981-82d6-4fe2e4713510
 
 
 On peut enfin charger des images !!!
-https://github.com/user-attachments/assets/02b4a58e-41e2-41f0-9375-e5ff1cc1d27d
 
