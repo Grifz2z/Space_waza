@@ -1,5 +1,60 @@
 use minifb::{Key, Window, WindowOptions, KeyRepeat};
 use rand::{seq::index, Rng};
+use std::{fs::File, path};
+use std::io::BufReader;
+use png::Decoder;
+
+///Fonction permettant de dessiner les pyxel des coordonnées (x; y) à (x; y+width)
+fn get_img_buff (path : &str) -> Vec<(u8, u8, u8, u8)> {
+
+    // ouvrir et extraire le png
+    let image = File::open(path).expect("waza erreur 1");
+    let decodeur = Decoder::new(BufReader::new(image));
+    let mut lu = decodeur.read_info().expect("waza erreur 2");
+    let mut buf = vec![0; lu.output_buffer_size()];
+    let info = lu.next_frame(&mut buf).expect("waza erreur 3");
+    let bytes = &buf[..info.buffer_size()];
+
+    let mut buffer_a_return: Vec<(u8, u8, u8, u8)> = Vec::new();
+
+    for i in 0..bytes.len(){
+        if i % 4 == 3 {
+            let pixel: (u8, u8, u8, u8) = (
+                bytes[i-3],  //R
+                bytes[i-2],  //G
+                bytes[i-1],  //B
+                bytes[i],    //A 
+                );
+
+            buffer_a_return.push(pixel);
+        }
+    }
+
+    return buffer_a_return;
+
+}
+
+fn f(x: u32, y: u32, w: u32) -> u32{ // permet de retrouver l'indice d'un pixel avec ses coordonnées
+    return w*y +x;
+}
+
+fn g(i: u32, w: u32) -> (u32, u32) { // permet de retrouver un pixel avec son indice dans le buffer
+    let coo_x = i%w;
+    let coo_y= i/w; //div entière
+    return (coo_x, coo_y);
+}
+
+fn reduce_buf(img_buf : &mut Vec<(u8, u8, u8, u8)>, u: u32, w_total: u32, w: u32, v: u32) -> Vec<(u8, u8, u8, u8)>{
+    let indice_img_choisie: u32 = f(u,v, w_total);
+    let mut nouveau_buffer_de_l_image = Vec::new();
+    for y in 0..w{
+        for x in 0..w{
+            let coordonne : u32 = indice_img_choisie + f(x,y,w);
+            nouveau_buffer_de_l_image.push(img_buf[coordonne as usize]);
+        }
+    }
+    return nouveau_buffer_de_l_image;
+}
 
 ///Fonction permettant de dessiner les pyxel des coordonnées (x; y) à (x; y+width)
 fn draw_pixel(buf: &mut Vec<u32>, x: u32, y: u32, width: u32, colour : u32) {
@@ -7,6 +62,21 @@ fn draw_pixel(buf: &mut Vec<u32>, x: u32, y: u32, width: u32, colour : u32) {
     if x < width && y * width < buf.len() as u32 { // Calculer l'index uniquement si (x, y) est dans les limites du buffer
         let index = (y * width + x) as usize;
         buf[index] = colour; // Couleur noire
+    }
+}
+
+fn from_u8_rgb(r: u8, g: u8, b: u8) -> u32 {
+    let (r, g, b) = (r as u32, g as u32, b as u32);
+    (r << 16) | (g << 8) | b
+}
+
+fn dessiner_img (buf: &mut Vec<u32>, w_screen : u32, x: u32, y: u32, w_img_buffer: u32, w: u32, u: u32, v: u32, path_: &str) {
+    let mut img_buff: Vec<(u8, u8, u8, u8)> = get_img_buff(path_);
+    let buffer_img_mais_le_vrai = reduce_buf(&mut img_buff, u, w_img_buffer, w, v);
+    for i in 0..w{
+        for j in 0..w{
+            draw_pixel(buf, x+j, y+i, w_screen, from_u8_rgb(buffer_img_mais_le_vrai[f(j, i, w) as usize].0,buffer_img_mais_le_vrai[f(j, i, w) as usize].1, buffer_img_mais_le_vrai[f(j, i, w) as usize].2));
+        }
     }
 }
 
@@ -40,8 +110,8 @@ struct ElementGraphique {
 
 impl ElementGraphique {
     /// Dessine le rectangle qui forme l'élément graphique
-    pub fn draw(&self, buf : &mut Vec<u32>, width_screen: u32, width : u32, height : u32) {
-        draw_rect(buf, self.x as u32, self.y as u32, width_screen, width, height, self.col)
+    pub fn draw(&self, buf : &mut Vec<u32>, width_screen: u32, w_img_buffer: u32,u:u32,v:u32 , path_ : &str) {
+        dessiner_img(buf, width_screen, self.x as u32, self.y as u32, w_img_buffer, self.width, u, v, path_);
     }
 
     /// Met à jour l'élément graphique
@@ -108,8 +178,8 @@ impl Vaisseau {
             self.parent.y - 5.0,
             0.0, 
             -5.0, 
-            10, 
-            15, 
+            64, 
+            64, 
             0xfff000
         ));
     }
@@ -227,8 +297,8 @@ impl Jeu {
             -20.0, 
             0.0, 
             2.0, 
-            40, 
-            40,
+            128, 
+            128,
             0xffA5B6));
     }
 
@@ -310,18 +380,18 @@ impl Jeu {
 
     /// Dessine l'ensemble des choses présentes dans le jeu
     pub fn draw(&mut self){
-        self.player.parent.draw(&mut self.buffer, self.width_screen,self.player.parent.width,self.player.parent.height);
+        self.player.parent.draw(&mut self.buffer, self.width_screen, 126, 0, 0, "assets/spaceship.png");
 
         for tir in &self.player.liste_tirs {
-            tir.parent.draw(&mut self.buffer, self.width_screen, tir.parent.width,tir.parent.height);
+            tir.parent.draw(&mut self.buffer, self.width_screen, 64, 0, 0, "assets/capybara_xs.png");
         }
 
         for ennemy in &self.liste_ennemis{
-            ennemy.parent.draw(&mut self.buffer, self.width_screen, ennemy.parent.width,ennemy.parent.height);
+            ennemy.parent.draw(&mut self.buffer, self.width_screen, 200, 0, 0, "assets/capybara.png");
         }
 
         for i in 0..self.player.vies{
-            draw_rect(&mut self.buffer, 10+i as u32*60, 565, self.width_screen, 30, 30,0xff0000);
+            draw_rect(&mut self.buffer, 10+i as u32*60, self.height_screen-50, self.width_screen, 30, 30,0xff0000);
         }
     }
 
@@ -340,8 +410,8 @@ impl Jeu {
 
 fn main() {
 
-    let player = Vaisseau::new(10.0, 510.0, 0.0, 0.0, 50, 50, 0xd6270f);
-    let mut app = Jeu::new(800,600,60,player);
+    let player = Vaisseau::new(10.0, 800.0, 0.0, 0.0, 128, 128, 0xd6270f);
+    let mut app = Jeu::new(1600,1000,165,player);
 
     app.run();
     
