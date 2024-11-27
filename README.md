@@ -6,7 +6,7 @@ Première chose faite : un écran rouge.
 
 
 2ème chose faite : le vaisseau et les missiles.
-![video]https://github.com/user-attachments/assets/2d06a807-91d3-453f-b89a-cc79b7d6044d
+![video](https://github.com/user-attachments/assets/2d06a807-91d3-453f-b89a-cc79b7d6044d)
 
 
 
